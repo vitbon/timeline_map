@@ -1,0 +1,492 @@
+<html>
+  <head>
+    <style>
+      html,
+      body,
+      #map,
+      gmp-map {
+        margin: 0;
+        padding: 0;
+        min-width: 100%;
+        min-height: 100%;
+      }
+      .controls {
+        position: absolute;
+        top: 10;
+        right: 10;
+        width: 300px;
+        z-index: 100;
+        background: white;
+        padding: 10px;
+      }
+    </style>
+    <link rel="stylesheet" href="./styles.css" />
+    <!-- <link
+      rel="stylesheet"
+      href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css"
+    />
+    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script> -->
+  </head>
+
+  <body>
+    <div class="controls">
+      <p id="std">
+        <small>
+          <span id="sti">?</span> Last Message: <span id="lmd">?</span>
+        </small>
+      </p>
+      <div class="row">
+        <div class="col">
+          <label for="range" class="form-label">Icon size</label>
+          <input
+            type="range"
+            min="1"
+            max="3"
+            step="0.5"
+            value="2"
+            class="form-range"
+            id="range"
+          />
+        </div>
+        <div class="col">
+          <label for="inpt" class="form-label">TTL (mins)</label>
+          <input type="text" value="120" class="form-control" id="inpt" />
+        </div>
+      </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDSp46J2mWUsd4btwN9cHr0YafTScH2tqw&libraries=maps,marker"></script>
+    <script>
+      var geocoder;
+      var map;
+      var map_data = {
+        init_lat: 50.591351115388164,
+        init_long: 36.5878326600486,
+        init_zoom: 10,
+        zoom_address: 16,
+        canvas_id: "",
+      };
+      var infowindow = new google.maps.InfoWindow();
+
+      const urlParams = new URLSearchParams(document.location.search);
+      const timeMSec = Math.abs(parseInt(urlParams.get("t")) || 10000);
+      var wss_url = `wss://sanya.408dev.com/alrts/${timeMSec}`;
+      // var wss_url = `ws://localhost:8081/alrts/${timeMSec}`;
+
+      var scale = 2;
+      const svgInit = {
+        scale: {
+          pep: 2,
+          static: 0.045,
+          plain: 0.041,
+        },
+        color: {
+          pep: "blue",
+          static: "black",
+          plain: "darkgreen",
+        },
+        pin: {
+          pep: {
+            glyphColor: "#FFFFFFCC",
+            background: "#0000FF66",
+            borderColor: "transparent",
+          },
+          static: {
+            // glyphColor: "#FFFFFF99",
+            glyph: "",
+            background: "black",
+            borderColor: "transparent",
+          },
+          plain: {
+            // glyphColor: "#FFFF0077",
+            glyph: "",
+            background: "darkgreen",
+            borderColor: "transparent",
+          },
+        },
+      };
+      var ttl = 120;
+
+      var websocket = null;
+      var ws_status = ["🟡", "🟢", "🔴"];
+      var ws_status_clr = ["orange", "green", "red"];
+      var peps = [];
+      var markersStatic = {};
+      var markersPep = {};
+      var markersPlains = {};
+
+      let markers = [];
+      markers.push(
+        new google.maps.marker.AdvancedMarkerElement({
+          map,
+          position: { lat: 37.419, lng: -122.02 },
+        })
+      );
+      markers.push(
+        new google.maps.marker.AdvancedMarkerElement({
+          map,
+          position: { lat: 37.519, lng: -124.02 },
+        })
+      );
+
+      const tmzd = new Date().getTimezoneOffset() * 60000;
+      var lastTmst = (Date.now() - tmzd - ttl * 60000) / 1000;
+
+      let color = (prio, alpha) =>
+        "rgba(" +
+        (prio ? 255 : 0) +
+        "," +
+        0 +
+        "," +
+        (prio ? 0 : 255) +
+        "," +
+        (0.2 + 0.8 * alpha) +
+        ")";
+      let infoWindowContent = (title, msg) =>
+        "<h4>" + title + "</h4>" + "<p>" + msg + "</p>";
+      let mTitle = (pep) =>
+        (pep.prio ? "!!! " : "") +
+        pep.date +
+        " " +
+        pep.time +
+        " (" +
+        pep.frequency +
+        " MHz)";
+      let mMsg = (pep) => pep.message.join("<br>");
+
+      function init_map(init_data) {
+        map_data = Object.assign(map_data, init_data);
+        geocoder = new google.maps.Geocoder();
+        var mapOptions = {
+          streetViewControl: true,
+          fullscreenControl: false,
+          zoomControl: true,
+          scaleControl: true,
+          mapTypeControl: true,
+          mapTypeControlOptions: {
+            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+            mapTypeIds: ["roadmap", "terrain", "satellite"],
+          },
+          center: new google.maps.LatLng(map_data.init_lat, map_data.init_long),
+          zoom: map_data.init_zoom,
+          mapId: "DEMO_MAP_ID",
+        };
+        map = new google.maps.Map(
+          document.getElementById(map_data.canvas_id),
+          mapOptions
+        );
+        return map;
+      }
+
+      function addMarker(pos, fillColor) {
+        zoom = map_data.init_zoom;
+        if (!pos)
+          pos = new google.maps.LatLng(map_data.init_lat, map_data.init_long);
+        const pin = new google.maps.marker.PinElement({
+          ...svgInit.pin.pep,
+          scale: scale / 2,
+          background: fillColor,
+        });
+        let mrk = new google.maps.marker.AdvancedMarkerElement({
+          map,
+          position: pos,
+          content: pin.element,
+        });
+        return mrk;
+      }
+
+      function addMarkerStatic(pos, fillColor) {
+        zoom = map_data.init_zoom;
+        if (!pos)
+          pos = new google.maps.LatLng(map_data.init_lat, map_data.init_long);
+        const pin = new google.maps.marker.PinElement({
+          ...svgInit.pin.static,
+          scale: scale / 2,
+        });
+        let mrk = new google.maps.marker.AdvancedMarkerElement({
+          map,
+          position: pos,
+          content: pin.element,
+        });
+        return mrk;
+      }
+
+      function addMarkerPlain(pos, fillColor = svgInit.color.plain) {
+        zoom = map_data.init_zoom;
+        if (!pos)
+          pos = new google.maps.LatLng(map_data.init_lat, map_data.init_long);
+        const pin = new google.maps.marker.PinElement({
+          ...svgInit.pin.plain,
+          scale: scale / 2,
+        });
+        let mrk = new google.maps.marker.AdvancedMarkerElement({
+          map,
+          position: pos,
+          content: pin.element,
+        });
+        return mrk;
+      }
+
+      function onClickMarker(m, msg) {
+        return function () {
+          infowindow.setContent(msg);
+          infowindow.open(map, m);
+        };
+      }
+
+      function setMarkerWindow(m) {
+        google.maps.event.clearInstanceListeners(m.marker);
+        let cc = "";
+
+        for (let pep of m.peps)
+          cc += "<hr>" + infoWindowContent(mTitle(pep), mMsg(pep));
+        let mcnt =
+          m.peps.length > 1
+            ? "<strong><u>" + m.peps.length + " PEPs: </u></strong>"
+            : "";
+        google.maps.event.addListener(
+          m.marker,
+          "click",
+          onClickMarker(
+            m.marker,
+            "<p class='text-muted'>" +
+              mcnt +
+              m.coords[0] +
+              ", " +
+              m.coords[1] +
+              "</p>" +
+              cc
+          )
+        );
+      }
+
+      function setMarkerPlainWindow(m) {
+        google.maps.event.clearInstanceListeners(m.marker);
+        let cc = "";
+        for (let plain of m.peps)
+          cc += "<hr>" + infoWindowContent(plain.title, plain.id);
+        google.maps.event.addListener(
+          m.marker,
+          "click",
+          onClickMarker(
+            m.marker,
+            "<p class='text-muted'>" +
+              m.coords[0] +
+              ", " +
+              m.coords[1] +
+              "</p>" +
+              cc
+          )
+        );
+      }
+
+      function setWsStatus(st) {
+        document.getElementById("sti").innerText = ws_status[st];
+        document.getElementById("std").style.color = ws_status_clr[st];
+      }
+
+      function messageIn(msg) {
+        try {
+          let now = new Date(Date.now() - tmzd).getTime();
+          let { type, data } = JSON.parse(msg.data);
+
+          // show STATIC data
+          if (type === "static") {
+            lastTmst = data[0].timestamp;
+
+            for (let static of data) {
+              const {
+                coords: [c],
+                prio,
+                timestamp,
+                date,
+                time,
+              } = static;
+
+              let key = "" + c[0] + "_" + c[1];
+
+              if (!markersStatic[key]) {
+                markersStatic[key] = {
+                  coords: c,
+                  peps: [static],
+                  marker: addMarkerStatic(
+                    new google.maps.LatLng(c[0], c[1]),
+                    "#300000"
+                  ),
+                };
+              } else {
+                if (markersStatic[key].timestamp != timestamp) {
+                  markersStatic[key].peps[0].timestamp = timestamp;
+                  markersStatic[key].peps[0].date = date;
+                  markersStatic[key].peps[0].time = time;
+                }
+              }
+              setMarkerWindow(markersStatic[key]);
+            }
+          }
+
+          // show PLAINS data
+          if (type === "plains") {
+            lastTmst = data[0].timestamp;
+            for (let plain of data) {
+              const { id, coords: c, title, v } = plain;
+
+              if (!markersPlains[id]) {
+                markersPlains[id] = {
+                  coords: c,
+                  peps: [plain],
+                  marker: addMarkerPlain(new google.maps.LatLng(c[0], c[1])),
+                };
+              } else {
+                markersPlains[id].coords = c;
+                markersPlains[id].marker.position = { lat: c[0], lng: c[1] };
+              }
+              setMarkerPlainWindow(markersPlains[id]);
+            }
+          }
+
+          // show PEP data
+          if (type === "pep") {
+            let now = new Date(Date.now() - tmzd).getTime();
+            lastTmst = data.timestamp;
+            let ttli = 60000 * ttl;
+            let a = 1000 * data.timestamp + ttli - now;
+
+            for (let c of data.coords) {
+              let key = "" + c[0] + "_" + c[1];
+
+              if (!markersPep[key]) {
+                markersPep[key] = {
+                  coords: c,
+                  peps: [data],
+                  marker: addMarker(
+                    new google.maps.LatLng(c[0], c[1]),
+                    color(data.prio, a / ttli)
+                  ),
+                };
+              } else {
+                markersPep[key].peps.push(data);
+                let prio = false;
+                let a = 0;
+                for (let p of markersPep[key].peps) {
+                  a = Math.max(a, 1000 * p.timestamp + ttli - now);
+                  if (p.prio) prio = true;
+                }
+
+                if (a / ttli < 0) {
+                  markersPep[key].marker.setOpacity(a / ttli);
+                } else {
+                  markersPep[key].marker.map = null;
+                }
+              }
+              setMarkerWindow(markersPep[key]);
+            }
+          }
+
+          document.getElementById("lmd").innerText = new Date(
+            lastTmst * 1000
+          ).toLocaleString(undefined, { timeZone: "UTC" });
+        } catch (e) {
+          console.log(e);
+        }
+      }
+
+      function onTimer(upd) {
+        let now = new Date(Date.now() - tmzd).getTime();
+        let ttli = 60000 * ttl;
+
+        // modify Pep
+        for (let mc in markersPep) {
+          let m = markersPep[mc];
+          let peps = m.peps.filter((p) => 1000 * p.timestamp + ttli - now > 0);
+          let changed = upd || m.peps.length != peps.length;
+          m.peps = peps;
+          if (peps.length == 0) {
+            m.marker.setMap(null);
+            delete markersPep[mc];
+          } else if (changed) {
+            let a = 0;
+            let prio = false;
+            for (let p of peps) {
+              a = Math.max(a, 1000 * p.timestamp + ttli - now);
+              if (p.prio) prio = true;
+            }
+            const pin = new google.maps.marker.PinElement({
+              ...svgInit.pin.pep,
+              scale: scale / 2,
+              background: color(prio, a / ttli),
+            });
+            m.marker.content = pin.element;
+            setMarkerWindow(m);
+          }
+        }
+
+        if (upd) {
+          // modify Static
+          for (let value of Object.values(markersStatic)) {
+            const pin = new google.maps.marker.PinElement({
+              ...svgInit.pin.static,
+              scale: scale / 2,
+            });
+            value.marker.content = pin.element;
+          }
+          // modify Plains
+          for (let value of Object.values(markersPlains)) {
+            const pin = new google.maps.marker.PinElement({
+              ...svgInit.pin.plain,
+              scale: scale / 2,
+            });
+            value.marker.content = pin.element;
+          }
+        }
+      }
+
+      function init_ws() {
+        if (websocket) websocket = null;
+        setWsStatus(0);
+        websocket = new WebSocket(wss_url);
+        websocket.onmessage = messageIn;
+        websocket.onopen = () => {
+          setWsStatus(1);
+          websocket.send(lastTmst.toString());
+        };
+        websocket.onclose = () => {
+          setWsStatus(2);
+          setTimeout(init_ws, 1000);
+        };
+      }
+
+      function blr(e) {
+        if (!e.keyCode || e.keyCode == 13) {
+          let ttln = parseInt(e.target.value);
+          ttln = !isNaN(ttln) && ttln >= 1 ? ttln : ttl;
+          e.target.value = ttln;
+          if (ttl != ttln) {
+            ttl = ttln;
+            for (let mn in markersPep) markersPep[mn].marker.setMap(null);
+            markersPep = {};
+            // lastTmst = (Date.now() - tmzd - ttl * 60000) / 1000;
+            // if (websocket) websocket.send(lastTmst.toString());
+          }
+        }
+      }
+
+      window.onload = function () {
+        document
+          .getElementById("range")
+          .addEventListener("change", function (e) {
+            scale = parseFloat(e.target.value);
+            onTimer(true);
+          });
+        document.getElementById("inpt").addEventListener("blur", blr);
+        document.getElementById("inpt").addEventListener("keyup", blr);
+        setInterval(onTimer, 300);
+        map = init_map({ canvas_id: "map" });
+
+        init_ws();
+      };
+    </script>
+  </body>
+</html>

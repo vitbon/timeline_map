@@ -1,0 +1,33 @@
+.controls {
+  position: absolute;
+  top: 10px;
+  right: 140px;
+  width: 300px;
+  z-index: 100;
+  background: #ffffffee;
+  padding: 10px;
+}
+
+.controls #std {
+  margin: 0;
+}
+
+.custom-marker {
+  height: 30px;
+  width: 30px;
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.popover {
+  max-width: 400px !important;
+}
+
+#layerToggle {
+  position: absolute;
+  top: 10px;
+  left: 45px;
+  background: #ffffffdd;
+  padding: 5px 10px;
+  z-index: 1000;
+}

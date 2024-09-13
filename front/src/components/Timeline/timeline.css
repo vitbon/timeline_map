@@ -1,0 +1,145 @@
+:root {
+  --white: #ffffff;
+  --red: #9b2e30;
+  --darkgrey: #22272b;
+  --line: #ffffff45;
+  --picker: #0078d2;
+  --picker-hover: #0091ff;
+  --picker-bg: #0078d288;
+  --picker-pressed: #f7fafc;
+}
+
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 60px;
+  width: 100vw;
+  padding: 6px 8px 5px;
+  background: var(--darkgrey);
+  transition: all 0.2s ease-in-out;
+  z-index: 10;
+}
+
+.timeline-container:hover {
+  justify-content: space-between;
+  transition: all 0.2s ease-in-out;
+}
+
+.timeline-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.tl-live-button {
+  height: 24px;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 8px;
+  background: var(--red);
+  transition: all 0.2s ease-in-out;
+}
+
+.tl-live-button_inactive {
+  color: var(--white);
+  background: var(--darkgrey);
+  border: 1px solid var(--red);
+  transition: all 0.2s ease-in-out;
+}
+
+.tl-lines {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  margin-bottom: 10px;
+  overflow: scroll;
+}
+
+.tl-lines-wrapper {
+  display: flex;
+  justify-content: space-between;
+}
+
+.tl-lines-time {
+  font-size: 11px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 500;
+  color: var(--white);
+  margin-left: 4px;
+  padding: 0;
+  height: 12px;
+  line-height: 12px;
+  /* min-width: 42%; */
+  width: 42%;
+}
+
+.tl-lines-time_hover {
+  color: var(--darkgrey);
+  background-color: var(--white);
+  border-radius: 8px;
+  margin-left: 0;
+  padding: 0 5px 0 4px;
+  cursor: pointer;
+}
+
+.tl-lines-span-hr,
+.tl-lines-span-hr_active {
+  height: 12px;
+  position: relative;
+}
+
+.active-bg {
+  color: var(--white);
+  background-color: var(--picker);
+}
+
+.tl-lines-hr {
+  background-color: var(--line);
+  height: 2px;
+  border: 0;
+  margin-top: 5px;
+}
+
+.tl-lines-hr_hover {
+  background-color: var(--white);
+}
+
+.tl-lines-hr_active {
+  background-color: var(--picker);
+  height: 2px;
+  border: 0;
+  margin-top: 5px;
+}
+
+.active-bg-transp {
+  color: var(--white);
+  background-color: var(--picker-bg);
+}
+
+.tl-scale {
+  display: flex;
+  justify-content: center;
+  align-self: center;
+  gap: 8px;
+  transition: all 0.2s ease-in-out;
+}
+
+.tl-scale button {
+  padding: 0 20px;
+  height: 30px;
+  width: 44%;
+  font-size: 20px;
+  background-color: transparent;
+  transition: all 0.2s ease-in-out;
+}
