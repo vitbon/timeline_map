@@ -77,26 +77,44 @@ function MapView() {
   }, []);
 
   useEffect(() => {
+    if (storeStatus.isLive) {
+      deleteAllMarkers();
+      for (let i = 0; i < 1; i++) {
+        const element = storeWebsocket[i];
+        if (element) {
+          showMarker(element);
+        }
+      }
+    }
+  }, [storeStatus.isLive, storeWebsocket]);
+
+  useEffect(() => {
+    deleteAllMarkers();
+    const min = Math.min(storeStatus.rangeStart, storeStatus.rangeEnd);
+    const max = Math.max(storeStatus.rangeStart, storeStatus.rangeEnd);
+    const index = storeWebsocket.findIndex(item => item.timestamp === min);
+    for (let i = index; i >= 0; i--) {
+      const element = storeWebsocket.at(i);
+      if (element?.timestamp > max) break;
+      showMarker(element);
+    }
+  }, [storeStatus.rangeStart, storeStatus.rangeEnd]);
+
+  function deleteAllMarkers() {
     for (let key in markers.current) {
       markers.current[key].marker.setPosition(undefined);
       delete markers.current[key];
     }
+  }
 
-    if (storeStatus.isLive) {
-      for (let i = 0; i < 1; i++) {
-        const element = storeWebsocket.at(i);
-        if (element) {
-          const { coords, timestamp } = element;
-          const svg = addMarker(element);
-          mapInstance.addOverlay(svg);
-          markers.current[timestamp] = {
-            coords,
-            marker: svg,
-          };
-        }
-      }
-    }
-  }, [storeStatus, storeWebsocket]);
+  function showMarker(element) {
+    const svg = addMarker(element);
+    mapInstance.addOverlay(svg);
+    markers.current[element.timestamp] = {
+      coords: element.coords,
+      marker: svg,
+    };
+  }
 
   return <div ref={mapRef} id="map" />;
 }

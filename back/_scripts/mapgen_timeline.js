@@ -3,8 +3,8 @@ const base_lat = 50.591351115388164; // Latitude:  [-90...90]
 
 process.env.TZ = 'Europe/Kyiv';
 const tmzd = new Date().getTimezoneOffset() * 60000;
-// MS between messages (10000)
-const MS_INT = 10000;
+// MS between messages
+const MS_INT = 30000;
 const LAT_1KM_FROM_DEG = 0.00841;
 const LON_1KM_FROM_DEG = 0.01426;
 const LON_KM_MAX = 60;
@@ -29,9 +29,10 @@ console.log('listening on port: ' + port);
 
 wss.on('connection', function connection(ws, req) {
   let timeout = req.url.split('/')[2]
-    ? parseInt(req.url.split('/')[2])
-    : MS_INT;
+  ? parseInt(req.url.split('/')[2])
+  : MS_INT;
   const tSec = timeout / 1000; // time t between sending messages (sec)
+
   let tmrPep = null;
 
   const generateDataObject = () => {
@@ -53,19 +54,26 @@ wss.on('connection', function connection(ws, req) {
         base_lat + LAT_1KM_FROM_DEG * LAT_KM_MAX * (Math.random() - 0.5),
         base_lon + LON_1KM_FROM_DEG * LON_KM_MAX * (Math.random() - 0.5),
       ]);
+    
+    const localDate = new Date();
+    const startDate = new Date(
+      Date.UTC(
+        localDate.getFullYear(),
+        localDate.getMonth(),
+        localDate.getDay() + 15,
+        localDate.getHours(),
+        localDate.getMinutes(),
+        localDate.getSeconds() >= 30 ? 30 : 0,
+        0
+      )
+    );
 
     return {
-      frequency: 400 + 100 * Math.random(),
-      timestamp: Math.floor((Date.now() - tmzd) / 1000),
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toISOString().split('T')[1].split('.')[0],
-      district: '',
-      division: '',
-      abons: [],
-      nicknames: [],
-      message,
+      timestamp: Math.floor(new Date(startDate).getTime() / 1000),
+      date: new Date(startDate).toISOString().split('T')[0],
+      time: new Date(startDate).toISOString().split('T')[1].split('.')[0],
       coords,
-      prio: Math.random() > 0.5,
+      frequency: 400 + 100 * Math.random(),
     };
   };
 

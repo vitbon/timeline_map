@@ -6,6 +6,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import {
+  STATUS,
   changeStatusLive,
   setStatusLiveOff,
   setStatusSelectionOn,
@@ -13,6 +14,7 @@ import {
   setStatusRangeStart,
   setStatusRangeEnd,
   statusRangeClear,
+  setStatusStretchRange,
 } from '../../features/status/statusSlice';
 import { getScaleInfo } from '../../app/utils';
 import './timeline.css';
@@ -25,6 +27,7 @@ const SCALE_MAX = 5;
 function Timeline() {
   const [isPanelFull, setIsPanelFull] = useState(true);
   const [scaleFactor, setScaleFactor] = useState(0);
+  const [isPlusBtnDisabled, setIsPlusBtnDisabled] = useState(true);
   const [elementHovered, setElementHovered] = useState(null);
   const scaleInfo = useRef(getScaleInfo(scaleFactor));
   const rangeSelect = useRef({});
@@ -43,40 +46,67 @@ function Timeline() {
     );
   }, [storeStatus.rangeStart, storeStatus.rangeEnd]);
 
+  useEffect(() => {
+    setIsPlusBtnDisabled(
+      scaleFactor === SCALE_MAX ||
+        getScaleInfo(scaleFactor + 1)?.step > storeWebsocket.length
+    );
+  }, [scaleFactor, storeWebsocket.length]);
+
   const showScaler = () => {
     const TL_LINES_TIME = 'tl-lines-time';
     const TL_LINES_HR = 'tl-lines-hr';
     const TL_LINES_HR__ACTIVE = 'tl-lines-hr_active';
     const TL_LINES_SPAN_HR = 'tl-lines-span-hr';
-    const TL_LINES_SPAN_HR__ACTIVE = 'tl-lines-span-hr_active';
+    const { multiplBigLine, interval, step, ruler } = scaleInfo.current;
     let layout = [];
+    let idxRuler = 0;
+    let start = 0;
     let rulerCounter = 0;
 
-    const showTime = index => {
+    const showTime = (index, timestamp) => {
+      if (
+        storeStatus.isSelection &&
+        storeStatus.stretchRange === STATUS.STRETCH_RANGE_END &&
+        storeStatus.rangeEnd - scaleInfo.current.interval === timestamp
+      ) {
+        const range =
+          (rangeSelect.current.max - rangeSelect.current.min) /
+            scaleInfo.current.interval +
+          1;
+        return `${((range * scaleInfo.current.interval) / 60).toFixed(1)} хв`;
+      }
       if (rulerCounter) return '';
       return scaleFactor
-        ? storeWebsocket[index]?.time.slice(0, -3) // without seconds
-        : storeWebsocket[index]?.time; // with seconds
+        ? storeWebsocket[index]?.time.slice(0, -3)
+        : storeWebsocket[index]?.time;
     };
 
-    const getClassesTime = index => {
+    const getClassesTime = (index, timestamp) => {
       let classes = TL_LINES_TIME;
-      if (!rulerCounter && elementHovered === index)
-        classes += ` ${TL_LINES_TIME}_hover`;
+      if (!rulerCounter && elementHovered === timestamp)
+        return (classes += ` ${TL_LINES_TIME}_hover`);
       if (storeStatus.isLive && index === 0)
         classes += ` active-bg ${TL_LINES_TIME}_hover `;
       if (
         !storeStatus.isLive &&
-        rangeSelect.current.max &&
-        rangeSelect.current.min <= index &&
-        rangeSelect.current.max >= index
+        // !scaleFactor &&
+        rangeSelect.current?.max === timestamp
       ) {
         classes += ` active-bg ${TL_LINES_TIME}_hover `;
       }
+      if (
+        storeStatus.isSelection &&
+        storeStatus.stretchRange === STATUS.STRETCH_RANGE_END &&
+        storeStatus.rangeEnd - scaleInfo.current.interval === timestamp
+      ) {
+        classes += ` ${TL_LINES_TIME}_hover`;
+      }
+
       return classes;
     };
 
-    const getClassesSpan = (index, secondRow = false) => {
+    const getClassesSpan = (index, timestamp, secondRow = false) => {
       let classes = TL_LINES_SPAN_HR;
       if (storeStatus.isLive) {
         if (index === 0 && (secondRow || isPanelFull))
@@ -85,11 +115,11 @@ function Timeline() {
       }
       if (!storeStatus.isLive && rangeSelect.current.max) {
         if (
-          (rangeSelect.current.min <= index &&
-            rangeSelect.current.max >= index) ||
+          (rangeSelect.current.min <= timestamp &&
+            rangeSelect.current.max >= timestamp) ||
           (!secondRow &&
-            rangeSelect.current.min <= index &&
-            rangeSelect.current.max + 1 >= index)
+            rangeSelect.current.min - scaleInfo.current.interval <= timestamp &&
+            rangeSelect.current.max >= timestamp)
         ) {
           classes += ` active-bg-transp`;
         }
@@ -97,45 +127,76 @@ function Timeline() {
       return classes;
     };
 
-    const getClassesSpanHr = index => {
+    const getClassesSpanHr = (index, timestamp) => {
       let classes = TL_LINES_HR;
       if (storeStatus.isLive && (index === 0 || index === 1))
-        classes = `${TL_LINES_HR__ACTIVE}`;
-      if (elementHovered === index) classes += ` ${TL_LINES_HR}_hover`;
+        classes += ` ${TL_LINES_HR__ACTIVE}`;
+      if (elementHovered === timestamp)
+        return classes + ` ${TL_LINES_HR}_hover`;
+      if (
+        storeStatus.isSelection &&
+        storeStatus.stretchRange === STATUS.STRETCH_RANGE_END &&
+        storeStatus.rangeEnd - scaleInfo.current.interval === timestamp
+      ) {
+        return classes + ` ${TL_LINES_HR}_hover`;
+      }
       if (
         !storeStatus.isLive &&
         rangeSelect.current.max &&
-        rangeSelect.current.min <= index &&
-        rangeSelect.current.max + 1 >= index
+        rangeSelect.current.min - scaleInfo.current.interval <= timestamp &&
+        rangeSelect.current.max >= timestamp
       ) {
-        classes = ` ${TL_LINES_HR__ACTIVE}`;
+        classes += ` ${TL_LINES_HR__ACTIVE}`;
       }
+
       return classes;
     };
 
+    // calculate a start's index of the websocket's data
     for (let i = 0; i < storeWebsocket.length; i++) {
-      const index = i * scaleInfo.current.step;
-      if (index >= storeWebsocket.length) break;
+      if (storeWebsocket[i]?.timestamp % interval === 0) {
+        start = i;
+        break;
+      }
+    }
+    // get the multiplBigLine's index
+    for (idxRuler = start; idxRuler < storeWebsocket.length; idxRuler++) {
+      if (storeWebsocket[idxRuler].timestamp % multiplBigLine === 0) break;
+    }
+    // rulerCounter's index using the current scale
+    for (let rev = idxRuler; rev > 0; rev--) {
+      if (storeWebsocket[rev]?.timestamp % interval === 0) {
+        rulerCounter = ruler.length - Math.round((rev - start) / step);
+        break;
+      }
+    }
 
+    for (
+      let index = start;
+      index < storeWebsocket.length;
+      index += scaleInfo.current?.step
+    ) {
+      if (index >= storeWebsocket.length) break;
+      const timestamp = storeWebsocket[index]?.timestamp;
       layout.push(
         <div
-          onMouseDown={e => handleOnMouseDown(e, index)}
-          onMouseMove={e => handleOnMouseMove(e, index)}
-          onMouseUp={e => handleOnMouseUp(e, index)}
-          key={
-            storeWebsocket[index]?.timestamp + storeWebsocket[index]?.frequency
-          }
+          onMouseDown={e => handleOnMouseDown(e, index, timestamp)}
+          onMouseMove={e => handleOnMouseMove(e, timestamp)}
+          onMouseUp={e => handleOnMouseUp(e, timestamp)}
+          key={timestamp + storeWebsocket[index]?.frequency}
         >
           <div
             className="tl-lines-wrapper"
-            onMouseOver={() => setElementHovered(index)}
+            onMouseOver={() => setElementHovered(timestamp)}
             onMouseOut={() => setElementHovered(null)}
           >
             {isPanelFull && (
-              <span className={getClassesTime(index)}>{showTime(index)}</span>
+              <span className={getClassesTime(index, timestamp)}>
+                {showTime(index, timestamp)}
+              </span>
             )}
             <span
-              className={getClassesSpan(index)}
+              className={getClassesSpan(index, timestamp)}
               style={{
                 width: isPanelFull
                   ? `${scaleInfo.current.ruler[rulerCounter] * 12.5}%`
@@ -144,16 +205,18 @@ function Timeline() {
               }}
             >
               {!isPanelFull && storeStatus.isLive && !index ? (
-                <span className={getClassesTime(index)}>{showTime(index)}</span>
+                <span className={getClassesTime(index, timestamp)}>
+                  {showTime(index, timestamp)}
+                </span>
               ) : (
-                <hr className={getClassesSpanHr(index)} />
+                <hr className={getClassesSpanHr(index, timestamp)} />
               )}
             </span>
           </div>
           <div className="tl-lines-wrapper" style={{ zIndex: 1 }}>
             {isPanelFull && <span></span>}
             <span
-              className={getClassesSpan(index, true)}
+              className={getClassesSpan(index, timestamp, true)}
               style={{
                 height: scaleInfo.current.marginBottom,
                 width: isPanelFull
@@ -169,20 +232,54 @@ function Timeline() {
     return layout;
   };
 
-  const handleOnMouseDown = (e, index) => {
+  const handleOnMouseDown = (e, index, timestamp) => {
     e.preventDefault();
-    dispatch(setStatusLiveOff());
-    dispatch(setStatusRangeStart(index));
-    dispatch(setStatusRangeEnd(index));
-    dispatch(setStatusSelectionOn());
+    if (
+      storeStatus.rangeStart &&
+      storeStatus.rangeEnd &&
+      timestamp + scaleInfo.current.interval === storeStatus.rangeEnd
+    ) {
+      dispatch(setStatusLiveOff());
+      dispatch(setStatusRangeEnd(timestamp + scaleInfo.current.interval));
+      dispatch(setStatusStretchRange(STATUS.STRETCH_RANGE_END));
+      dispatch(setStatusSelectionOn());
+    } else {
+      dispatch(setStatusLiveOff());
+      dispatch(setStatusRangeStart(timestamp));
+      if (
+        scaleFactor &&
+        storeWebsocket.findIndex(i => i.timestamp === timestamp) <
+          storeWebsocket.length - 2
+      ) {
+        dispatch(
+          setStatusRangeEnd(
+            storeWebsocket[index + scaleInfo.current.step].timestamp
+          )
+        );
+      } else {
+        dispatch(setStatusRangeEnd(timestamp));
+      }
+      dispatch(setStatusSelectionOn());
+    }
   };
 
-  const handleOnMouseMove = (e, index) => {
+  const handleOnMouseMove = (e, timestamp) => {
     e.preventDefault();
-    if (storeStatus.isSelection) dispatch(setStatusRangeEnd(index));
+    if (
+      storeStatus.isSelection ||
+      storeStatus.stretchRange === STATUS.STRETCH_RANGE_END
+    )
+      dispatch(setStatusRangeEnd(timestamp));
   };
+
   const handleOnMouseUp = e => {
     e.preventDefault();
+    dispatch(setStatusSelectionOff());
+  };
+
+  const handleOnMouseLeaveContainer = e => {
+    e.preventDefault();
+    setIsPanelFull(false);
     dispatch(setStatusSelectionOff());
   };
 
@@ -193,7 +290,6 @@ function Timeline() {
   };
 
   const handleMinusButton = () => {
-    if (scaleFactor <= SCALE_MIN) return;
     scaleInfo.current = getScaleInfo(scaleFactor - 1);
     setScaleFactor(scaleFactor - 1);
   };
@@ -207,7 +303,7 @@ function Timeline() {
     <div
       className="timeline-container"
       onMouseEnter={() => setIsPanelFull(true)}
-      // onMouseLeave={() => setIsPanelFull(false)}
+      // onMouseLeave={handleOnMouseLeaveContainer}
       style={{
         width: isPanelFull ? `${PANEL_WIDTH * 2}px` : `${PANEL_WIDTH}px`,
       }}
@@ -230,10 +326,13 @@ function Timeline() {
       </div>
       {isPanelFull && (
         <div className="tl-scale">
-          <button onClick={handleMinusButton}>
+          <button
+            onClick={handleMinusButton}
+            disabled={scaleFactor === SCALE_MIN}
+          >
             <FontAwesomeIcon icon={faMagnifyingGlassMinus} size="xs" />
           </button>
-          <button onClick={handlePlusButton}>
+          <button onClick={handlePlusButton} disabled={isPlusBtnDisabled}>
             <FontAwesomeIcon icon={faMagnifyingGlassPlus} size="xs" />
           </button>
         </div>

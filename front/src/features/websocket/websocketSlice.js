@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = [];
-const ONE_DAY = 86430; // one day and 30 seconds in seconds
+const ONE_DAY = 90001; // 1 day + 1 hour + 1 sec in seconds
 
 export const websocketSlice = createSlice({
   name: 'websocket',

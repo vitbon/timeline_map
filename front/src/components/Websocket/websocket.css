@@ -16,6 +16,8 @@
   height: 30px;
   width: 30px;
   position: absolute;
+  bottom: 0;
+  right: auto;
   transform: translate(-50%, -50%);
 }
 

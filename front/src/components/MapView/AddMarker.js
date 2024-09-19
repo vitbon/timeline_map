@@ -6,7 +6,7 @@ export function addMarker(marker, fillColor = '#f20') {
   const [pos] = marker.coords;
   const SCALE_MULTI = 15;
   const svgContent = `
-      <span style="font-size: 14px; font-weight: 700; margin-left: -17px;
+      <span style="font-size: 12px; font-weight: 700; margin-left: -16px;
         text-shadow: 0px 0px 2px black, 1px 1px 1px black"
       >
         ${marker.time}
@@ -27,7 +27,7 @@ export function addMarker(marker, fillColor = '#f20') {
 
   const markerOverlay = new Overlay({
     position: fromLonLat([pos[1], pos[0]]),
-    positioning: 'center-center',
+    positioning: 'bottom-center',
     element: markerElement,
     stopEvent: false,
   });
