@@ -26,7 +26,20 @@ const startDate = new Date(
   )
 );
 
-const data = Array.from({ length: 3633 }, (value, index) => {
+// const startDate = new Date(
+//   Date.UTC(localDate, {
+//     timeZone: 'Europe/London',
+//     hour12: false,
+//     year: 'numeric',
+//     month: '2-digit',
+//     day: '2-digit',
+//     hour: '2-digit',
+//     minute: '2-digit',
+//     second: '2-digit',
+//   })
+// );
+
+const data = Array.from({ length: 150 }, (value, index) => {
   const currentDate = startDate.getTime() - index * INTERVAL;
   let coords = [];
   coords.unshift([

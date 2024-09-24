@@ -5,7 +5,6 @@ const initialState = {
   isSelection: false,
   rangeStart: null,
   rangeEnd: null,
-  stretchRange: null,
 };
 
 
@@ -31,7 +30,6 @@ export const statusSlice = createSlice({
     },
     setStatusSelectionOff: state => {
       state.isSelection = false;
-      state.stretchRange = null;
     },
     setStatusRangeStart: (state, action) => {
       state.rangeStart = action.payload;
@@ -43,16 +41,8 @@ export const statusSlice = createSlice({
       state.rangeStart = null;
       state.rangeEnd = null;
     },
-    setStatusStretchRange: (state, action) => {
-      state.stretchRange = action.payload;
-    },
   },
 });
-
-export const STATUS = {
-  STRETCH_RANGE_START: "start",
-  STRETCH_RANGE_END: "end",
-};
 
 export const {
   changeStatusLive,
@@ -63,7 +53,6 @@ export const {
   setStatusRangeStart,
   setStatusRangeEnd,
   statusRangeClear,
-  setStatusStretchRange,
 } = statusSlice.actions;
 
 export default statusSlice.reducer;

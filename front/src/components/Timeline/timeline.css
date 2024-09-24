@@ -111,6 +111,7 @@
 
 .tl-lines-hr_hover {
   background-color: var(--white);
+  cursor: pointer;
 }
 
 .tl-lines-hr_active {

@@ -6,7 +6,6 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-  STATUS,
   changeStatusLive,
   setStatusLiveOff,
   setStatusSelectionOn,
@@ -14,33 +13,39 @@ import {
   setStatusRangeStart,
   setStatusRangeEnd,
   statusRangeClear,
-  setStatusStretchRange,
 } from '../../features/status/statusSlice';
-import { getScaleInfo } from '../../app/utils';
+import { getScaleInfo, localFromUTC } from '../../app/utils';
 import './timeline.css';
 
 const PANEL_WIDTH = 56;
 const LIVE = 'LIVE';
 const SCALE_MIN = 0;
 const SCALE_MAX = 5;
+const STATUS = {
+  STRETCH_RANGE_START: 'start',
+  STRETCH_RANGE_END: 'end',
+};
 
 function Timeline() {
   const [isPanelFull, setIsPanelFull] = useState(true);
   const [scaleFactor, setScaleFactor] = useState(0);
   const [isPlusBtnDisabled, setIsPlusBtnDisabled] = useState(true);
   const [elementHovered, setElementHovered] = useState(null);
-  const scaleInfo = useRef(getScaleInfo(scaleFactor));
-  const rangeSelect = useRef({});
+  const stretchRangeRef = useRef(null);
+  const firstSelectElemRef = useRef(null);
+  const scaleInfoRef = useRef(getScaleInfo(scaleFactor));
+  const rangeSelectRef = useRef({});
+  const scaleFactorIDsRef = useRef([]);
   const storeWebsocket = useSelector(state => state.websocket);
   const storeStatus = useSelector(state => state.status);
   const dispatch = useDispatch();
 
   useEffect(() => {
-    rangeSelect.current.min = Math.min(
+    rangeSelectRef.current.min = Math.min(
       storeStatus.rangeStart,
       storeStatus.rangeEnd
     );
-    rangeSelect.current.max = Math.max(
+    rangeSelectRef.current.max = Math.max(
       storeStatus.rangeStart,
       storeStatus.rangeEnd
     );
@@ -48,7 +53,7 @@ function Timeline() {
 
   useEffect(() => {
     setIsPlusBtnDisabled(
-      scaleFactor === SCALE_MAX ||
+      scaleFactor >= SCALE_MAX ||
         getScaleInfo(scaleFactor + 1)?.step > storeWebsocket.length
     );
   }, [scaleFactor, storeWebsocket.length]);
@@ -58,28 +63,35 @@ function Timeline() {
     const TL_LINES_HR = 'tl-lines-hr';
     const TL_LINES_HR__ACTIVE = 'tl-lines-hr_active';
     const TL_LINES_SPAN_HR = 'tl-lines-span-hr';
-    const { multiplBigLine, interval, step, ruler } = scaleInfo.current;
+    const { multiplBigLine, interval, step, ruler } = scaleInfoRef.current;
     let layout = [];
     let idxRuler = 0;
     let start = 0;
     let rulerCounter = 0;
 
+    const isSelectionStretchRangeEnd = timestamp =>
+      storeStatus.isSelection &&
+      stretchRangeRef.current === STATUS.STRETCH_RANGE_END &&
+      storeStatus.rangeEnd === timestamp;
+
+    const isScaleFactorFirstSelect = timestamp =>
+      scaleFactor && firstSelectElemRef.current === timestamp;
+
     const showTime = (index, timestamp) => {
-      if (
-        storeStatus.isSelection &&
-        storeStatus.stretchRange === STATUS.STRETCH_RANGE_END &&
-        storeStatus.rangeEnd - scaleInfo.current.interval === timestamp
-      ) {
+      if (isSelectionStretchRangeEnd(timestamp)) {
         const range =
-          (rangeSelect.current.max - rangeSelect.current.min) /
-            scaleInfo.current.interval +
+          (rangeSelectRef.current.max - rangeSelectRef.current.min) / interval +
           1;
-        return `${((range * scaleInfo.current.interval) / 60).toFixed(1)} хв`;
+        return `${((range * interval) / 60).toFixed(1)} хв`;
+      }
+      if (isScaleFactorFirstSelect(timestamp)) {
+        return localFromUTC(storeStatus.rangeStart).slice(-8);
       }
       if (rulerCounter) return '';
       return scaleFactor
-        ? storeWebsocket[index]?.time.slice(0, -3)
-        : storeWebsocket[index]?.time;
+        ? localFromUTC(storeWebsocket[index]?.timestamp).slice(-8).slice(0, -3)
+        : localFromUTC(storeWebsocket[index]?.timestamp).slice(-8);
+      // return String(storeWebsocket[index]?.timestamp).slice(-7);
     };
 
     const getClassesTime = (index, timestamp) => {
@@ -88,21 +100,15 @@ function Timeline() {
         return (classes += ` ${TL_LINES_TIME}_hover`);
       if (storeStatus.isLive && index === 0)
         classes += ` active-bg ${TL_LINES_TIME}_hover `;
-      if (
-        !storeStatus.isLive &&
-        // !scaleFactor &&
-        rangeSelect.current?.max === timestamp
-      ) {
-        classes += ` active-bg ${TL_LINES_TIME}_hover `;
+      if (!scaleFactor && storeStatus.rangeStart === timestamp) {
+        classes += ` active-bg ${TL_LINES_TIME}_hover`;
       }
-      if (
-        storeStatus.isSelection &&
-        storeStatus.stretchRange === STATUS.STRETCH_RANGE_END &&
-        storeStatus.rangeEnd - scaleInfo.current.interval === timestamp
-      ) {
+      if (isScaleFactorFirstSelect(timestamp)) {
+        classes += ` active-bg ${TL_LINES_TIME}_hover`;
+      }
+      if (isSelectionStretchRangeEnd(timestamp)) {
         classes += ` ${TL_LINES_TIME}_hover`;
       }
-
       return classes;
     };
 
@@ -113,16 +119,19 @@ function Timeline() {
           return classes + ` active-bg-transp`;
         if (index === 1 && !secondRow) return classes + ` active-bg-transp`;
       }
-      if (!storeStatus.isLive && rangeSelect.current.max) {
+      if (!storeStatus.isLive && rangeSelectRef.current.max) {
         if (
-          (rangeSelect.current.min <= timestamp &&
-            rangeSelect.current.max >= timestamp) ||
+          (rangeSelectRef.current.max >= timestamp &&
+            rangeSelectRef.current.min + interval <= timestamp) ||
           (!secondRow &&
-            rangeSelect.current.min - scaleInfo.current.interval <= timestamp &&
-            rangeSelect.current.max >= timestamp)
+            rangeSelectRef.current.max >= timestamp &&
+            rangeSelectRef.current.min <= timestamp)
         ) {
           classes += ` active-bg-transp`;
         }
+      }
+      if (isScaleFactorFirstSelect(timestamp)) {
+        classes += ` active-bg-transp`;
       }
       return classes;
     };
@@ -133,22 +142,18 @@ function Timeline() {
         classes += ` ${TL_LINES_HR__ACTIVE}`;
       if (elementHovered === timestamp)
         return classes + ` ${TL_LINES_HR}_hover`;
-      if (
-        storeStatus.isSelection &&
-        storeStatus.stretchRange === STATUS.STRETCH_RANGE_END &&
-        storeStatus.rangeEnd - scaleInfo.current.interval === timestamp
-      ) {
+      if (isSelectionStretchRangeEnd(timestamp)) {
         return classes + ` ${TL_LINES_HR}_hover`;
       }
       if (
-        !storeStatus.isLive &&
-        rangeSelect.current.max &&
-        rangeSelect.current.min - scaleInfo.current.interval <= timestamp &&
-        rangeSelect.current.max >= timestamp
+        isScaleFactorFirstSelect(timestamp) ||
+        (!storeStatus.isLive &&
+          rangeSelectRef.current.max &&
+          rangeSelectRef.current.max >= timestamp &&
+          rangeSelectRef.current.min <= timestamp)
       ) {
         classes += ` ${TL_LINES_HR__ACTIVE}`;
       }
-
       return classes;
     };
 
@@ -171,10 +176,36 @@ function Timeline() {
       }
     }
 
+    if (scaleFactor && storeStatus.rangeStart) {
+      scaleFactorIDsRef.current = [];
+      for (
+        let index = start;
+        index < storeWebsocket.length;
+        index += scaleInfoRef.current?.step
+      ) {
+        if (index >= storeWebsocket.length) break;
+        const timestamp = storeWebsocket[index]?.timestamp;
+        scaleFactorIDsRef.current.push(timestamp);
+      }
+      firstSelectElemRef.current = scaleFactorIDsRef?.current[0];
+      for (let i = 0; i < scaleFactorIDsRef?.current.length; i++) {
+        const diffScaleFactorIDs =
+          scaleFactorIDsRef?.current[i] - storeStatus.rangeStart;
+        const diffFirstSelect =
+          firstSelectElemRef.current - storeStatus.rangeStart;
+
+        if (diffScaleFactorIDs < 0) break;
+        if (diffScaleFactorIDs < diffFirstSelect) {
+          firstSelectElemRef.current = scaleFactorIDsRef?.current[i];
+        }
+      }
+    }
+
+    // layout
     for (
       let index = start;
       index < storeWebsocket.length;
-      index += scaleInfo.current?.step
+      index += scaleInfoRef.current?.step
     ) {
       if (index >= storeWebsocket.length) break;
       const timestamp = storeWebsocket[index]?.timestamp;
@@ -199,7 +230,7 @@ function Timeline() {
               className={getClassesSpan(index, timestamp)}
               style={{
                 width: isPanelFull
-                  ? `${scaleInfo.current.ruler[rulerCounter] * 12.5}%`
+                  ? `${scaleInfoRef.current.ruler[rulerCounter] * 12.5}%`
                   : '100%',
                 zIndex: index === 0 ? 1 : null,
               }}
@@ -218,47 +249,31 @@ function Timeline() {
             <span
               className={getClassesSpan(index, timestamp, true)}
               style={{
-                height: scaleInfo.current.marginBottom,
+                height: scaleInfoRef.current.marginBottom,
                 width: isPanelFull
-                  ? `${scaleInfo.current.ruler[rulerCounter] * 12.5}%`
+                  ? `${scaleInfoRef.current.ruler[rulerCounter] * 12.5}%`
                   : '100%',
               }}
             ></span>
           </div>
         </div>
       );
-      if (++rulerCounter >= scaleInfo.current.ruler.length) rulerCounter = 0;
+      if (++rulerCounter >= scaleInfoRef.current.ruler.length) rulerCounter = 0;
     }
     return layout;
   };
 
   const handleOnMouseDown = (e, index, timestamp) => {
     e.preventDefault();
-    if (
-      storeStatus.rangeStart &&
-      storeStatus.rangeEnd &&
-      timestamp + scaleInfo.current.interval === storeStatus.rangeEnd
-    ) {
+    if (storeStatus.rangeEnd && timestamp === storeStatus.rangeEnd) {
       dispatch(setStatusLiveOff());
-      dispatch(setStatusRangeEnd(timestamp + scaleInfo.current.interval));
-      dispatch(setStatusStretchRange(STATUS.STRETCH_RANGE_END));
+      dispatch(setStatusRangeEnd(timestamp));
+      stretchRangeRef.current = STATUS.STRETCH_RANGE_END;
       dispatch(setStatusSelectionOn());
     } else {
       dispatch(setStatusLiveOff());
       dispatch(setStatusRangeStart(timestamp));
-      if (
-        scaleFactor &&
-        storeWebsocket.findIndex(i => i.timestamp === timestamp) <
-          storeWebsocket.length - 2
-      ) {
-        dispatch(
-          setStatusRangeEnd(
-            storeWebsocket[index + scaleInfo.current.step].timestamp
-          )
-        );
-      } else {
-        dispatch(setStatusRangeEnd(timestamp));
-      }
+      dispatch(setStatusRangeEnd(timestamp - scaleInfoRef.current.interval));
       dispatch(setStatusSelectionOn());
     }
   };
@@ -266,14 +281,17 @@ function Timeline() {
   const handleOnMouseMove = (e, timestamp) => {
     e.preventDefault();
     if (
-      storeStatus.isSelection ||
-      storeStatus.stretchRange === STATUS.STRETCH_RANGE_END
-    )
+      storeStatus.rangeEnd !== timestamp &&
+      (storeStatus.isSelection ||
+        stretchRangeRef.current === STATUS.STRETCH_RANGE_END)
+    ) {
       dispatch(setStatusRangeEnd(timestamp));
+    }
   };
 
   const handleOnMouseUp = e => {
     e.preventDefault();
+    stretchRangeRef.current = null;
     dispatch(setStatusSelectionOff());
   };
 
@@ -284,13 +302,14 @@ function Timeline() {
   };
 
   const handlePlusButton = () => {
-    if (scaleFactor >= SCALE_MAX) return;
-    scaleInfo.current = getScaleInfo(scaleFactor + 1);
+    firstSelectElemRef.current = null;
+    scaleInfoRef.current = getScaleInfo(scaleFactor + 1);
     setScaleFactor(scaleFactor + 1);
   };
 
   const handleMinusButton = () => {
-    scaleInfo.current = getScaleInfo(scaleFactor - 1);
+    firstSelectElemRef.current = null;
+    scaleInfoRef.current = getScaleInfo(scaleFactor - 1);
     setScaleFactor(scaleFactor - 1);
   };
 
@@ -303,7 +322,7 @@ function Timeline() {
     <div
       className="timeline-container"
       onMouseEnter={() => setIsPanelFull(true)}
-      // onMouseLeave={handleOnMouseLeaveContainer}
+      onMouseLeave={handleOnMouseLeaveContainer}
       style={{
         width: isPanelFull ? `${PANEL_WIDTH * 2}px` : `${PANEL_WIDTH}px`,
       }}

@@ -90,12 +90,13 @@ function MapView() {
 
   useEffect(() => {
     deleteAllMarkers();
-    const min = Math.min(storeStatus.rangeStart, storeStatus.rangeEnd);
     const max = Math.max(storeStatus.rangeStart, storeStatus.rangeEnd);
-    const index = storeWebsocket.findIndex(item => item.timestamp === min);
-    for (let i = index; i >= 0; i--) {
+    const min = Math.min(storeStatus.rangeStart, storeStatus.rangeEnd);
+    const indexMax = storeWebsocket.findIndex(item => item.timestamp === max);
+    const indexMin = storeWebsocket.findIndex(item => item.timestamp === min);
+    for (let i = indexMax; i < indexMin; i++) {
       const element = storeWebsocket.at(i);
-      if (element?.timestamp > max) break;
+      if (element?.timestamp < min) break;
       showMarker(element);
     }
   }, [storeStatus.rangeStart, storeStatus.rangeEnd]);
