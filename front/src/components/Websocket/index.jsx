@@ -13,48 +13,10 @@ const LAT_KM_MAX = 40;
 const INTERVAL = 30 * 1000;
 const base_lon = 36.5878326600486;
 const base_lat = 50.591351115388164;
-const localDate = new Date();
-const startDate = new Date(
-  Date.UTC(
-    localDate.getFullYear(),
-    localDate.getMonth(),
-    localDate.getDay() + 15,
-    localDate.getHours(),
-    localDate.getMinutes() - 1,
-    30,
-    0
-  )
-);
-
-// const startDate = new Date(
-//   Date.UTC(localDate, {
-//     timeZone: 'Europe/London',
-//     hour12: false,
-//     year: 'numeric',
-//     month: '2-digit',
-//     day: '2-digit',
-//     hour: '2-digit',
-//     minute: '2-digit',
-//     second: '2-digit',
-//   })
-// );
-
-const data = Array.from({ length: 150 }, (value, index) => {
-  const currentDate = startDate.getTime() - index * INTERVAL;
-  let coords = [];
-  coords.unshift([
-    base_lat + LAT_1KM_FROM_DEG * LAT_KM_MAX * (Math.random() - 0.5),
-    base_lon + LON_1KM_FROM_DEG * LON_KM_MAX * (Math.random() - 0.5),
-  ]);
-
-  return {
-    timestamp: Math.floor(new Date(currentDate).getTime() / 1000),
-    date: new Date(currentDate).toISOString().split('T')[0],
-    time: new Date(currentDate).toISOString().split('T')[1].split('.')[0],
-    frequency: Math.random() * 100 + 350,
-    coords,
-  };
-}).reverse();
+let startDate = new Date();
+const seconds = new Date(startDate).getSeconds() > 30 ? 30 : 0;
+startDate = new Date(startDate).setSeconds(seconds);
+startDate = new Date(startDate).setMilliseconds(0);
 
 const Websocket = () => {
   const [wsStatus, setWsStatus] = useState(0);
@@ -71,11 +33,30 @@ const Websocket = () => {
   }, []);
 
   const MS_INT = 30000;
+  const DATE_NUMBERS = 0;
   const urlParams = new URLSearchParams(document.location.search);
   const timeMSec = Math.abs(parseInt(urlParams.get('t')) || MS_INT);
+  const dateNumbers = Math.abs(parseInt(urlParams.get('d')) || DATE_NUMBERS);
   // const WSS_URL = `wss://sanya.408dev.com/alrts/${timeMSec}`;
   const WSS_URL = `ws://localhost:8081/alrts/${timeMSec}`;
   let websocket = null;
+
+  const data = Array.from({ length: dateNumbers }, (value, index) => {
+    const currentDate = startDate - (index + 1) * INTERVAL;
+    let coords = [];
+    coords.unshift([
+      base_lat + LAT_1KM_FROM_DEG * LAT_KM_MAX * (Math.random() - 0.5),
+      base_lon + LON_1KM_FROM_DEG * LON_KM_MAX * (Math.random() - 0.5),
+    ]);
+
+    return {
+      timestamp: Math.floor(currentDate / 1000),
+      date: new Date(currentDate).toISOString().split('T')[0],
+      time: new Date(currentDate).toISOString().split('T')[1].split('.')[0],
+      frequency: Math.random() * 100 + 350,
+      coords,
+    };
+  }).reverse();
 
   function init_ws() {
     if (websocket) websocket = null;

@@ -1,7 +1,7 @@
 const base_lon = 36.5878326600486; // Longitude: [-180...180]
 const base_lat = 50.591351115388164; // Latitude:  [-90...90]
 
-process.env.TZ = 'Europe/Kyiv';
+// process.env.TZ = 'Europe/Kyiv';
 const tmzd = new Date().getTimezoneOffset() * 60000;
 // MS between messages
 const MS_INT = 30000;
@@ -55,21 +55,13 @@ wss.on('connection', function connection(ws, req) {
         base_lon + LON_1KM_FROM_DEG * LON_KM_MAX * (Math.random() - 0.5),
       ]);
     
-    const localDate = new Date();
-    const startDate = new Date(
-      Date.UTC(
-        localDate.getFullYear(),
-        localDate.getMonth(),
-        localDate.getDay() + 15,
-        localDate.getHours(),
-        localDate.getMinutes(),
-        localDate.getSeconds() >= 30 ? 30 : 0,
-        0
-      )
-    );
+    let startDate = new Date();
+    const seconds = new Date(startDate).getSeconds() > 30 ? 30 : 0;
+    startDate = new Date(startDate).setSeconds(seconds);
+    startDate = new Date(startDate).setMilliseconds(0);
 
     return {
-      timestamp: Math.floor(new Date(startDate).getTime() / 1000),
+      timestamp: Math.floor(startDate / 1000),
       date: new Date(startDate).toISOString().split('T')[0],
       time: new Date(startDate).toISOString().split('T')[1].split('.')[0],
       coords,

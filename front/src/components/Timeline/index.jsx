@@ -36,6 +36,7 @@ function Timeline() {
   const scaleInfoRef = useRef(getScaleInfo(scaleFactor));
   const rangeSelectRef = useRef({});
   const scaleFactorIDsRef = useRef([]);
+  const scaleFactorFirstElementRef = useRef(null);
   const storeWebsocket = useSelector(state => state.websocket);
   const storeStatus = useSelector(state => state.status);
   const dispatch = useDispatch();
@@ -77,15 +78,22 @@ function Timeline() {
     const isScaleFactorFirstSelect = timestamp =>
       scaleFactor && firstSelectElemRef.current === timestamp;
 
+    const isScaleFactorIsliveFirstEl = timestamp =>
+      storeStatus.isLive &&
+      scaleFactor &&
+      scaleFactorFirstElementRef.current === timestamp;
+
     const showTime = (index, timestamp) => {
       if (isSelectionStretchRangeEnd(timestamp)) {
         const range =
-          (rangeSelectRef.current.max - rangeSelectRef.current.min) / interval +
-          1;
+          (rangeSelectRef.current.max - rangeSelectRef.current.min) / interval;
         return `${((range * interval) / 60).toFixed(1)} хв`;
       }
       if (isScaleFactorFirstSelect(timestamp)) {
         return localFromUTC(storeStatus.rangeStart).slice(-8);
+      }
+      if (isScaleFactorIsliveFirstEl(timestamp)) {
+        return localFromUTC(storeWebsocket[0]?.timestamp).slice(-8);
       }
       if (rulerCounter) return '';
       return scaleFactor
@@ -98,12 +106,16 @@ function Timeline() {
       let classes = TL_LINES_TIME;
       if (!rulerCounter && elementHovered === timestamp)
         return (classes += ` ${TL_LINES_TIME}_hover`);
+
       if (storeStatus.isLive && index === 0)
         classes += ` active-bg ${TL_LINES_TIME}_hover `;
       if (!scaleFactor && storeStatus.rangeStart === timestamp) {
         classes += ` active-bg ${TL_LINES_TIME}_hover`;
       }
-      if (isScaleFactorFirstSelect(timestamp)) {
+      if (
+        isScaleFactorFirstSelect(timestamp) ||
+        isScaleFactorIsliveFirstEl(timestamp)
+      ) {
         classes += ` active-bg ${TL_LINES_TIME}_hover`;
       }
       if (isSelectionStretchRangeEnd(timestamp)) {
@@ -138,7 +150,10 @@ function Timeline() {
 
     const getClassesSpanHr = (index, timestamp) => {
       let classes = TL_LINES_HR;
-      if (storeStatus.isLive && (index === 0 || index === 1))
+      if (
+        (storeStatus.isLive && (index === 0 || index === 1)) ||
+        isScaleFactorIsliveFirstEl(timestamp)
+      )
         classes += ` ${TL_LINES_HR__ACTIVE}`;
       if (elementHovered === timestamp)
         return classes + ` ${TL_LINES_HR}_hover`;
@@ -176,6 +191,7 @@ function Timeline() {
       }
     }
 
+    scaleFactorFirstElementRef.current = storeWebsocket[start]?.timestamp;
     if (scaleFactor && storeStatus.rangeStart) {
       scaleFactorIDsRef.current = [];
       for (
