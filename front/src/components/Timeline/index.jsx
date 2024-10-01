@@ -1,10 +1,14 @@
+// @ts-nocheck
 import React, { useState, useRef, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { FixedSizeList } from 'react-window';
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faMagnifyingGlassMinus,
   faMagnifyingGlassPlus,
 } from '@fortawesome/free-solid-svg-icons';
-import { useSelector, useDispatch } from 'react-redux';
+
 import {
   changeStatusLive,
   setStatusLiveOff,
@@ -13,8 +17,8 @@ import {
   setStatusRangeStart,
   setStatusRangeEnd,
   statusRangeClear,
-} from '../../features/status/statusSlice';
-import { getScaleInfo, localFromUTC } from '../../app/utils';
+} from '../../features/slices/status';
+import { getScaleInfo, localFromUTC } from './utils';
 import './timeline.css';
 
 const PANEL_WIDTH = 56;
@@ -29,7 +33,6 @@ const STATUS = {
 function Timeline() {
   const [isPanelFull, setIsPanelFull] = useState(true);
   const [scaleFactor, setScaleFactor] = useState(0);
-  const [isPlusBtnDisabled, setIsPlusBtnDisabled] = useState(true);
   const [elementHovered, setElementHovered] = useState(null);
   const stretchRangeRef = useRef(null);
   const firstSelectElemRef = useRef(null);
@@ -40,6 +43,7 @@ function Timeline() {
   const storeWebsocket = useSelector(state => state.websocket);
   const storeStatus = useSelector(state => state.status);
   const dispatch = useDispatch();
+  let layout = [];
 
   useEffect(() => {
     rangeSelectRef.current.min = Math.min(
@@ -52,20 +56,14 @@ function Timeline() {
     );
   }, [storeStatus.rangeStart, storeStatus.rangeEnd]);
 
-  useEffect(() => {
-    setIsPlusBtnDisabled(
-      scaleFactor >= SCALE_MAX ||
-        getScaleInfo(scaleFactor + 1)?.step > storeWebsocket.length
-    );
-  }, [scaleFactor, storeWebsocket.length]);
-
   const showScaler = () => {
     const TL_LINES_TIME = 'tl-lines-time';
     const TL_LINES_HR = 'tl-lines-hr';
     const TL_LINES_HR__ACTIVE = 'tl-lines-hr_active';
     const TL_LINES_SPAN_HR = 'tl-lines-span-hr';
+
     const { multiplBigLine, interval, step, ruler } = scaleInfoRef.current;
-    let layout = [];
+    // let layout = [];
     let idxRuler = 0;
     let start = 0;
     let rulerCounter = 0;
@@ -181,7 +179,7 @@ function Timeline() {
     }
     // get the multiplBigLine's index
     for (idxRuler = start; idxRuler < storeWebsocket.length; idxRuler++) {
-      if (storeWebsocket[idxRuler].timestamp % multiplBigLine === 0) break;
+      if (storeWebsocket[idxRuler]?.timestamp % multiplBigLine === 0) break;
     }
     // rulerCounter's index using the current scale
     for (let rev = idxRuler; rev > 0; rev--) {
@@ -190,7 +188,6 @@ function Timeline() {
         break;
       }
     }
-
     scaleFactorFirstElementRef.current = storeWebsocket[start]?.timestamp;
     if (scaleFactor && storeStatus.rangeStart) {
       scaleFactorIDsRef.current = [];
@@ -334,6 +331,15 @@ function Timeline() {
     dispatch(changeStatusLive());
   };
 
+  const isPlusBtnDisabled =
+    scaleFactor >= SCALE_MAX ||
+    getScaleInfo(scaleFactor + 1)?.step > storeWebsocket.length;
+
+  const virtualizerHeight =
+    document.querySelector('.tl-lines')?.offsetHeight ?? 800;
+
+  showScaler();
+
   return (
     <div
       className="timeline-container"
@@ -357,7 +363,18 @@ function Timeline() {
         >
           {LIVE} {isPanelFull && (storeStatus.isLive ? `ON` : `OFF`)}
         </button>
-        <div className="tl-lines">{showScaler()}</div>
+        <div className="tl-lines">
+          <FixedSizeList
+            height={virtualizerHeight}
+            width={112}
+            itemCount={layout.length}
+            itemSize={scaleInfoRef.current.heightElement}
+          >
+            {({ index, style }) => {
+              return <div style={style}>{layout[index]}</div>;
+            }}
+          </FixedSizeList>
+        </div>
       </div>
       {isPanelFull && (
         <div className="tl-scale">

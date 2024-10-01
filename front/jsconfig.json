@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./src",
+    "allowJs": true,
+    "noEmit": true, 
+    "checkJs": true,
+    "jsx": "react",
+  },
+  "exclude": ["node_modules", "**/node_modules/*"]
+}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
+
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile.js';
 import { VectorTile as VectorTileLayer } from 'ol/layer';
@@ -8,11 +9,12 @@ import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT.js';
 import { XYZ } from 'ol/source';
 import { fromLonLat } from 'ol/proj';
-import { vectorStyleNaming } from '../../app/utils';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import { addMarker } from './AddMarker.js';
 import 'ol/ol.css';
+
+import { addMarker } from './AddMarker.js';
+import { vectorStyleNaming } from './utils';
 import './mapview.css';
 
 export let mapInstance = null;
@@ -97,6 +99,7 @@ function MapView() {
     for (let i = indexMax; i < indexMin; i++) {
       const element = storeWebsocket.at(i);
       if (element?.timestamp < min) break;
+      if (!element.coords) continue;
       showMarker(element);
     }
   }, [storeStatus.rangeStart, storeStatus.rangeEnd]);

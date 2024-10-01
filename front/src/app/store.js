@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
-import statusReducer from '../features/status/statusSlice';
-import websocketReducer from '../features/websocket/websocketSlice';
+import statusReducer from '../features/slices/status';
+import websocketReducer from '../features/slices/websocket';
 
 export const store = configureStore({
   reducer: {

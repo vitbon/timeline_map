@@ -40,6 +40,7 @@ export default [
         { vars: 'all', args: 'after-used', ignoreRestSiblings: false },
       ],
       'react/prop-types': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
     },
   },
 ];

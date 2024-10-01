@@ -1,6 +1,5 @@
-// import { getMap } from '../components/MapView/mapSingleton';
 import { Fill, Stroke, Text, Style } from 'ol/style';
-import { mapInstance } from '../components/MapView/index';
+import { mapInstance } from './index';
 
 export const BOUNDARY = {
   country: { color: '#ffffffaa', width: 2 },
@@ -122,62 +121,4 @@ export function vectorStyleNaming(feature) {
     default:
       return null;
   }
-}
-
-export function getScaleInfo(scale) {
-  switch (scale) {
-    case 0:
-      return {
-        step: 1,
-        interval: 30,
-        marginBottom: '24px',
-        ruler: [4],
-        multiplBigLine: 30,
-      };
-    case 1:
-      return {
-        step: 2,
-        interval: 60,
-        marginBottom: '0',
-        ruler: [4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-        multiplBigLine: 900,
-      };
-    case 2:
-      return {
-        step: 10,
-        interval: 300,
-        marginBottom: '9px',
-        ruler: [4, 2, 2, 3, 2, 2],
-        multiplBigLine: 1800,
-      };
-    case 3:
-      return {
-        step: 30,
-        interval: 900,
-        marginBottom: '11px',
-        ruler: [4, 2, 3, 2],
-        multiplBigLine: 3600,
-      };
-    case 4:
-      return {
-        step: 60,
-        interval: 1800,
-        marginBottom: '4px',
-        ruler: [4, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
-        multiplBigLine: 21600,
-      };
-    case 5:
-      return {
-        step: 120,
-        interval: 3600,
-        marginBottom: '10px',
-        ruler: [4, 4, 4, 4, 4, 4],
-        multiplBigLine: 21600,
-      };
-  }
-}
-
-export function localFromUTC(seconds) {
-  const utcDate = new Date(seconds * 1000);
-  return utcDate.toLocaleString('en-GB')
 }

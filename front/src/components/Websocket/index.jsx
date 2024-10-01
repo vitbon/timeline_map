@@ -1,6 +1,11 @@
+// @ts-nocheck
 import React, { useEffect, useRef, useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { addWebsocketData } from '../../features/websocket/websocketSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  addWebsocketData,
+  setNewWebsocketArray,
+} from '../../features/slices/websocket';
+import { findAbsentTimestamps } from './utils';
 import './websocket.css';
 
 const WS_STATUS = ['🟡', '🟢', '🔴'];
@@ -25,12 +30,18 @@ const Websocket = () => {
   const [lastTmst, setLastTmst] = useState(
     (Date.now() - tmzd.current - TTL * 60000) / 1000
   );
+  const storeWebsocket = useSelector(state => state.websocket);
   const dispatch = useDispatch();
 
   useEffect(() => {
-    for (let i = 0; i < data.length; i++) dispatch(addWebsocketData(data[i]));
+    dispatch(setNewWebsocketArray(data));
     init_ws();
   }, []);
+
+  useEffect(() => {
+    const stamps = findAbsentTimestamps(storeWebsocket);
+    if (stamps) dispatch(setNewWebsocketArray(stamps));
+  }, [storeWebsocket]);
 
   const MS_INT = 30000;
   const DATE_NUMBERS = 0;
@@ -56,7 +67,7 @@ const Websocket = () => {
       frequency: Math.random() * 100 + 350,
       coords,
     };
-  }).reverse();
+  });
 
   function init_ws() {
     if (websocket) websocket = null;
@@ -74,7 +85,7 @@ const Websocket = () => {
     };
   }
 
-  function messageIn(msg) {
+  const messageIn = msg => {
     let now = new Date().toLocaleString('uk-UA', {
       month: 'long',
       day: 'numeric',
@@ -84,7 +95,7 @@ const Websocket = () => {
     });
     setLastMessage(now);
     dispatch(addWebsocketData(JSON.parse(msg.data)));
-  }
+  };
 
   return (
     <div className="controls" style={{ display: 'none' }}>
